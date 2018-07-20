@@ -5,7 +5,7 @@ import fs			= require('fs');
 import util			= require('util');
 import striptags	= require('striptags');
 import program		= require('commander');
-import cron			= require('node-cron');
+import ontime		= require('ontime');
 const Entities		= require('html-entities').AllHtmlEntities;
 const entities		= new Entities();
 const pkg			= require(__dirname + '/package.json');
@@ -25,6 +25,7 @@ program
 .option('--authorize',				'Authorize for use with an account, and exit')
 .option('-t, --trust <user>',		'Specify a username that should be trusted, and exit', addToList, [])
 .option('-d, --distrust <user>',	'Specify a username that should no longer be trusted, and exit', addToList, [])
+.option('-D, --dryrun',				'Print info about what would be done, but do not do anything')
 
 program.parse(process.argv);
 let opts = program.opts();
@@ -51,7 +52,7 @@ try {
 		options: {
 			sendOldest:		true,
 			visibility:		"public",
-			cron:			null,
+			times:			[],
 			alltoots:		false
 		}
 	};
@@ -128,6 +129,11 @@ function Authorize()
 
 function Dismiss(id: number): Promise<void>
 {
+	if (opts['dryrun']) {
+		console.log('NOT Dismissing: ' + id);
+		return Promise.resolve();
+	}
+
 	console.log('Dismissing: ' + id);
 	return M.post('notifications/dismiss', { id: id })
 	.then((res) => {
@@ -267,7 +273,14 @@ function FindImage(): Promise<any>
 			return;
 		}
 
-		// console.log(image);
+		if (opts['dryrun']) {
+			console.log('NOT reposting: ', image);
+
+			for (let attachment of image.status.media_attachments) {
+				console.log(attachment);
+			}
+			return;
+		}
 
 		/* Re-upload the images */
 		let media = [];
@@ -331,9 +344,17 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 		});
 	} else {
 		/* Normal mode; look for an image to post */
-		if (config.options.cron) {
-			cron.schedule(config.options.cron, () => {
-				FindImage();
+		if (config.options.times) {
+			ontime({
+				cycle:	config.options.times,
+				utc:	false,
+				single:	false,
+				log:	true
+			}, (ot) => {
+				FindImage()
+				.then(() => {
+					ot.done();
+				});
 			});
 		} else {
 			FindImage();
