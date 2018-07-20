@@ -4,25 +4,47 @@ const https			= require('https');
 const fs			= require('fs');
 const util			= require('util');
 const striptags		= require('striptags');
+import program		= require('commander');
 const Entities		= require('html-entities').AllHtmlEntities;
 const entities		= new Entities();
+const pkg			= require(__dirname + '/package.json');
 
 const writeFile		= util.promisify(fs.writeFile);
 
+function addToList(value, list)
+{
+	list.push(value);
+	return(list);
+}
+
+program
+.version(pkg.version)
+.option('-c, --config <path>',		'Specify the config file that should be used', __dirname + '/config.json')
+
+.option('--authorize',				'Authorize for use with an account, and exit')
+.option('-t, --trust <user>',		'Specify a username that should be trusted, and exit', addToList, [])
+.option('-d, --distrust <user>',	'Specify a username that should no longer be trusted, and exit', addToList, [])
+
+program.parse(process.argv);
+let opts = program.opts();
+
+
 let rl;
-
-let clientId;
-let clientSecret;
-
+let M;
 let config;
+
 try {
-	config = require('./config.json');
+	config = JSON.parse(fs.readFileSync(opts['config'], 'utf8'));
 
 	config.url.base		= `https://${config.url.host}`;
 	config.url.endpoint	= `${config.url.base}/api/v1/`;
 } catch (e) {
-	console.error(e);
+	if (e.code !== 'ENOENT') {
+		console.error(e);
+		process.exit(1);
+	}
 
+	// console.error(e);
 	config = {
 		senders:			[],
 		options: {
@@ -31,11 +53,6 @@ try {
 		}
 	};
 }
-
-const M = config ? new Mastodon({
-	access_token:	config.accessToken,
-	api_url:		config.url.endpoint
-}) : null;
 
 function ask(question: string): Promise<string>
 {
@@ -55,8 +72,6 @@ function ask(question: string): Promise<string>
 }
 
 // TODO Add an option to add an authorized sender or remove one
-// TODO Add an option to show usage
-
 function Authorize()
 {
 	ask('Instance host: ')
@@ -93,7 +108,7 @@ function Authorize()
 		config.accessToken = accessToken;
 
 		// console.log(JSON.stringify(config, null, 4));
-		return writeFile('config.json', JSON.stringify(config, null, 4), 'utf8');
+		return writeFile(opts['config'], JSON.stringify(config, null, 4), 'utf8');
 	})
 	.then(() => {
 		console.log('Config successfully stored; run again to start');
@@ -268,10 +283,47 @@ function FindImage(): Promise<any>
 	});
 }
 
-if (!config || !config.url || !config.accessToken) {
+if (!config || !config.url || !config.accessToken || opts['authorize']) {
 	console.log('First use; configuring');
 	Authorize();
 } else {
-	FindImage();
+	M = new Mastodon({
+		access_token:	config.accessToken,
+		api_url:		config.url.endpoint
+	});
+
+	if (opts['trust'].length > 0 || opts['distrust'].length > 0) {
+		if (opts['trust']) {
+			for (let addr of opts['trust']) {
+				/* We don't want a leading @ */
+				addr = addr.replace(/^@/, '');
+
+				if (-1 === config.senders.indexOf(addr)) {
+					config.senders.push(addr);
+				}
+			}
+		}
+
+		if (opts['distrust']) {
+			for (let addr of opts['distrust']) {
+				let i;
+
+				/* We don't want a leading @ */
+				addr = addr.replace(/^@/, '');
+
+				if (-1 !== (i = config.senders.indexOf(addr))) {
+					config.senders.splice(i, 1);
+				}
+			}
+		}
+
+		writeFile(opts['config'], JSON.stringify(config, null, 4), 'utf8')
+		.then(() => {
+			process.exit(0);
+		});
+	} else {
+		/* Normal mode; look for an image to post */
+		FindImage();
+	}
 }
 
