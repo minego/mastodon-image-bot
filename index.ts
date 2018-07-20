@@ -1,10 +1,11 @@
-const Mastodon		= require('mastodon-api');
-const readline		= require('readline');
-const https			= require('https');
-const fs			= require('fs');
-const util			= require('util');
-const striptags		= require('striptags');
+import Mastodon		= require('mastodon-api');
+import readline		= require('readline');
+import https		= require('https');
+import fs			= require('fs');
+import util			= require('util');
+import striptags	= require('striptags');
 import program		= require('commander');
+import cron			= require('node-cron');
 const Entities		= require('html-entities').AllHtmlEntities;
 const entities		= new Entities();
 const pkg			= require(__dirname + '/package.json');
@@ -49,7 +50,9 @@ try {
 		senders:			[],
 		options: {
 			sendOldest:		true,
-			visibility:		"public"
+			visibility:		"public",
+			cron:			null,
+			alltoots:		false
 		}
 	};
 }
@@ -141,9 +144,8 @@ function DownloadImage(id: number, url: string): Promise<string>
 		let req = https.get(url, function(res) {
 			res.pipe(file);
 			res.on('end', function() {
-				file.close(() => {
-					resolve(name);
-				})
+				file.close();
+				resolve(name);
 			});
 		});
 	});
@@ -242,8 +244,10 @@ function FindImage(): Promise<any>
 
 			if (!post.status.media_attachments || !post.status.media_attachments[0]) {
 				/* We currently only want posts with media */
-				p.push(Dismiss(post.id).catch(err => console.log(err)));
-				continue;
+				if (!config.options.alltoots) {
+					p.push(Dismiss(post.id).catch(err => console.log(err)));
+					continue;
+				}
 			}
 
 			// console.log('Possible image post: ', post);
@@ -260,7 +264,7 @@ function FindImage(): Promise<any>
 	.then(() => {
 		if (!image) {
 			console.error('No suitable images found');
-			process.exit(0);
+			return;
 		}
 
 		// console.log(image);
@@ -276,6 +280,10 @@ function FindImage(): Promise<any>
 		return Promise.all(media);
 	})
 	.then((media_ids) => {
+		if (!media_ids) {
+			return;
+		}
+
 		return Dismiss(image.id)
 		.then(() => {
 			return Post(image.status.content, media_ids, image.status.sensitive, image.status.spoiler_text)
@@ -323,7 +331,13 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 		});
 	} else {
 		/* Normal mode; look for an image to post */
-		FindImage();
+		if (config.options.cron) {
+			cron.schedule(config.options.cron, () => {
+				FindImage();
+			});
+		} else {
+			FindImage();
+		}
 	}
 }
 

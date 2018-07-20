@@ -15,3 +15,19 @@ will preserve the rest of the toot's body, the CW, etc.
 The notification of that DM will then be cleared so that the same image will not
 be posted again.
 
+The following options can be modified in the "options" section of the config
+file:
+	- sendOldest: By default the oldest applicable toot will be sent. If false
+	then the most recent applicable toot will be sent instead.
+
+	- cron: If not set then a single toot will be posted (if available) before
+	exiting. If set then a toot will be posted repeated on the specified
+	schedule (see node-cron for syntax details)
+
+	- visibility: The visibility that should be set for new posts. May be:
+		'public' 'unlisted' 'private' or 'direct'. Default is 'public' and
+		'direct' is useful for testing.
+
+	- alltoots: By default only images will be reposted. If alltoots is true
+	then all DMs sent by an authorized sender will be applicable for reposting.
+
