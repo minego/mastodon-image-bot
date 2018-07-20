@@ -7,6 +7,10 @@
     "prepare": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minego/mastodon-image-bot.git"
+  },
   "keywords": [
     "mastodon",
     "bot"
