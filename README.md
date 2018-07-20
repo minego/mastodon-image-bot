@@ -1,4 +1,4 @@
-# mastodon-image-bod
+# mastodon-image-bot
 A very simple account to allow posting images regularly from a mastodon account
 
 
