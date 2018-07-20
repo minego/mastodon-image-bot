@@ -1,2 +1,5 @@
 *.js
 *.js.map
+config.json
+node_modules
+
