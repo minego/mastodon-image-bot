@@ -3,6 +3,9 @@
   "version": "1.0.4",
   "description": "A simple image posting bot for Mastodon",
   "main": "index.js",
+  "bin": {
+    "masto-image": "./index.js"
+  },
   "scripts": {
     "prepare": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
