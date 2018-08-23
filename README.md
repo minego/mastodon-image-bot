@@ -17,12 +17,24 @@ be posted again.
 
 The following options can be modified in the "options" section of the config
 file:
+	- random: Pick a random post from the queue to send.
+
 	- sendOldest: By default the oldest applicable toot will be sent. If false
 	then the most recent applicable toot will be sent instead.
 
-	- cron: If not set then a single toot will be posted (if available) before
-	exiting. If set then a toot will be posted repeated on the specified
-	schedule (see node-cron for syntax details)
+	- times: A list of strings, each containing a time of day that the bot
+	should post, optionally followed by > and a value to indicate that the time
+	should be skipped if there are not at least the specified count of posts
+	available to send.
+
+	Example:
+		Send at midnight. If there are at least 10 images in the queue then also
+		send at noon.
+
+		"times": [
+			"00:00:00",
+			"12:00:00 > 10"
+		]
 
 	- visibility: The visibility that should be set for new posts. May be:
 		'public' 'unlisted' 'private' or 'direct'. Default is 'public' and
@@ -30,4 +42,8 @@ file:
 
 	- alltoots: By default only images will be reposted. If alltoots is true
 	then all DMs sent by an authorized sender will be applicable for reposting.
+
+	- boost: If true and there are no queued messages then the most popular toot
+	previously posted by the bot will be reboosted
+
 

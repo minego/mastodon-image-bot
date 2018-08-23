@@ -50,6 +50,7 @@ try {
 	config = {
 		senders:			[],
 		options: {
+			random:			false,
 			sendOldest:		true,
 			visibility:		"public",
 			times:			[],
@@ -127,7 +128,7 @@ function Authorize()
 	})
 }
 
-function Dismiss(id: number): Promise<void>
+function Dismiss(id: number | string): Promise<void>
 {
 	if (opts['dryrun']) {
 		console.log('NOT Dismissing: ' + id);
@@ -136,6 +137,34 @@ function Dismiss(id: number): Promise<void>
 
 	console.log('Dismissing: ' + id);
 	return M.post('notifications/dismiss', { id: id })
+	.then((res) => {
+		return;
+	});
+}
+
+function Boost(id: number | string): Promise<void>
+{
+	if (opts['dryrun']) {
+		console.log('NOT boosting: ' + id);
+		return Promise.resolve();
+	}
+
+	console.log('Boosting: ' + id);
+	return M.post('statuses/' + id + '/reblog', { })
+	.then((res) => {
+		return;
+	});
+}
+
+function Unboost(id: number): Promise<void>
+{
+	if (opts['dryrun']) {
+		console.log('NOT unboosting: ' + id);
+		return Promise.resolve();
+	}
+
+	console.log('Unboosting: ' + id);
+	return M.post('statuses/' + id + '/unreblog', { })
 	.then((res) => {
 		return;
 	});
@@ -207,13 +236,103 @@ function Post(text, media, sensitive, cw): Promise<any>
 	});
 }
 
-function FindImage(): Promise<any>
+function isUsableNotification(post, dismissList ?: any[])
 {
-	if (!config.senders) {
-		console.log('WARNING: There are no allowed senders');
-		process.exit(1);
+	if (-1 === post.account.acct.indexOf('@')) {
+		/* Sent from local instance */
+		post.account.acct += '@' + config.url.host;
 	}
 
+	if (!post.status.favourited &&
+		(!post.account || -1 == config.senders.indexOf(post.account.acct))
+	) {
+		/* This sender isn't authorized */
+		// console.log('not allowed', post.account.acct, config.senders);
+		if (dismissList) {
+			dismissList.push(Dismiss(post.id).catch(err => console.log(err)));
+		}
+		return(false);
+	}
+
+	if (post.status.visibility !== 'direct') {
+		/* Only resend direct messages */
+		if (dismissList) {
+			dismissList.push(Dismiss(post.id).catch(err => console.log(err)));
+		}
+		return(false);
+	}
+
+	if (!post.status.media_attachments || !post.status.media_attachments[0]) {
+		/* We currently only want posts with media */
+		if (!config.options.alltoots) {
+			if (dismissList) {
+				dismissList.push(Dismiss(post.id).catch(err => console.log(err)));
+			}
+			return(false);
+		}
+	}
+
+	// console.log('Possible image post: ', post);
+	return(true);
+}
+
+function BoostTheBest(force: boolean): Promise<any>
+{
+	console.log('No suitable images to toot; looking for an old one to boost');
+
+	let best = null;
+	let options = {
+		only_media:		true,
+		limit:			30,
+		exclude_types:	[ 'follow', 'favourite', 'reblog' ]
+	};
+
+	return M.get('accounts/verify_credentials', {})
+	.then((res) => {
+		// console.log('Account:', res.data);
+
+		return M.get('accounts/' + res.data.id + '/statuses', options)
+	})
+	.then((res) => {
+		let p = [];
+
+		for (let post of res.data) {
+			if (post.reblogged) {
+				continue;
+			}
+
+			if (!best) {
+				best = post;
+			} else if (	(post.reblogs_count + post.favourites_count) >
+						(best.reblogs_count + best.favourites_count)
+			) {
+				best = post;
+			}
+		}
+
+		if (best) {
+			/* Boost the best */
+			p.push(Boost(best.id));
+		} else {
+			if (force) {
+				/* Unboost all boosted toots */
+				for (let post of res.data) {
+					if (post.reblogged) {
+						p.push(Unboost(post.id));
+					}
+				}
+
+				/* Run again, but without the unboost pass */
+				return(BoostTheBest(false));
+			}
+		}
+
+		return Promise.all(p);
+	});
+}
+
+function FindImage(minimum: number): Promise<any>
+{
 	let options = {
 		only_media:		true,
 		limit:			30,
@@ -221,47 +340,59 @@ function FindImage(): Promise<any>
 	};
 
 	let image;
+	let skip		= 0;
+	let total		= 0;
 
-	return M.get('notifications', options).then((res) => {
-		// console.log(res.data)
-
+	return M.get('notifications', options)
+	.then((res) => {
 		let p = [];
 
-		// TODO Add an option for randomizing the order of the posts before we
-		//		look for a match.
 		for (let post of res.data) {
-			if (-1 === post.account.acct.indexOf('@')) {
-				/* Sent from local instance */
-				post.account.acct += '@' + config.url.host;
+			if (isUsableNotification(post, p)) {
+				total++;
+			}
+		}
+
+		if (opts['dryrun']) {
+			console.log(`Found ${total} suitable posts, minimum is ${minimum}`);
+		}
+
+		if (total === 0) {
+			if (minimum === 0 && config.options.boost) {
+				return BoostTheBest(true);
 			}
 
-			if (!post.account || -1 == config.senders.indexOf(post.account.acct)) {
-				/* This sender isn't authorized */
-				// console.log('not allowed', post.account.acct, config.senders);
-				p.push(Dismiss(post.id).catch(err => console.log(err)));
+			console.error('No suitable images found');
+			return;
+		}
+
+		if (total < minimum) {
+			console.error(`Skipping this pass because ${total} is less than the minimum required of ${minimum}`);
+			return;
+		}
+
+		if (config.options.random) {
+			/* Random */
+			skip = Math.floor(Math.random() * total);
+		} else if (config.options.sendOldest) {
+			/* Last */
+			skip = total - 1;
+		} else {
+			/* First */
+			skip = 0;
+		}
+
+		for (let post of res.data) {
+			if (!isUsableNotification(post)) {
 				continue;
 			}
 
-			if (post.status.visibility !== 'direct') {
-				/* Only resend direct messages */
-				p.push(Dismiss(post.id).catch(err => console.log(err)));
+			if (skip-- > 0) {
 				continue;
 			}
 
-			if (!post.status.media_attachments || !post.status.media_attachments[0]) {
-				/* We currently only want posts with media */
-				if (!config.options.alltoots) {
-					p.push(Dismiss(post.id).catch(err => console.log(err)));
-					continue;
-				}
-			}
-
-			// console.log('Possible image post: ', post);
 			image = post;
-
-			if (!config.options.sendOldest) {
-				break;
-			}
+			break;
 		}
 
 		/* Wait for all dismiss requests to finish */
@@ -269,7 +400,6 @@ function FindImage(): Promise<any>
 	})
 	.then(() => {
 		if (!image) {
-			console.error('No suitable images found');
 			return;
 		}
 
@@ -343,21 +473,41 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 			process.exit(0);
 		});
 	} else {
+		if (!config.senders) {
+			console.log('WARNING: There are no allowed senders');
+			process.exit(1);
+		}
+
 		/* Normal mode; look for an image to post */
 		if (config.options.times) {
-			ontime({
-				cycle:	config.options.times,
-				utc:	false,
-				single:	false,
-				log:	true
-			}, (ot) => {
-				FindImage()
-				.then(() => {
-					ot.done();
+			for (let time of config.options.times) {
+				let parts	= time.split('>');
+				let cycle	= parts[0].trim();
+				let min		= (parts[1] || '0').trim();
+				let m		= 0;
+
+				if (0 === min.indexOf('=')) {
+					/* >= x */
+					m = parseInt(min.slice(1)) - 1;
+				} else {
+					/* > x */
+					m = parseInt(min);
+				}
+
+				ontime({
+					cycle:	cycle,
+					utc:	false,
+					single:	false,
+					log:	true
+				}, (ot) => {
+					FindImage(m)
+					.then(() => {
+						ot.done();
+					});
 				});
-			});
+			}
 		} else {
-			FindImage();
+			FindImage(0);
 		}
 	}
 }
