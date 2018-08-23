@@ -246,11 +246,12 @@ function isUsableNotification(post, dismissList ?: any[])
 	if (!post.status.favourited &&
 		(!post.account || -1 == config.senders.indexOf(post.account.acct))
 	) {
-		/* This sender isn't authorized */
-		// console.log('not allowed', post.account.acct, config.senders);
-		if (dismissList) {
-			dismissList.push(Dismiss(post.id).catch(err => console.log(err)));
-		}
+		/*
+			This sender isn't authorized
+
+			Do not dismiss because the owner of the bot may go in and fav the
+			toot, making it authorized.
+		*/
 		return(false);
 	}
 
