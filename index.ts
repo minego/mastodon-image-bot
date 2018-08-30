@@ -58,7 +58,7 @@ set(config.options,	'sendOldest',	true);
 set(config.options,	'visibility',	'public');
 set(config.options,	'times',		[]);
 set(config.options,	'tags',			[]);
-set(config.options,	'boost',		true);
+set(config.options,	'boosts',		true);
 set(config.options,	'alltoots',		false);
 
 if (isNaN(config.options.notifymin)) {
