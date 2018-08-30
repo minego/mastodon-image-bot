@@ -35,34 +35,46 @@ let opts = program.opts();
 let rl;
 let M;
 let config;
+let configChanged	= false;
 
 try {
 	config = JSON.parse(fs.readFileSync(opts['config'], 'utf8'));
 
 	config.url.base		= `https://${config.url.host}`;
 	config.url.endpoint	= `${config.url.base}/api/v1/`;
-
-	if (isNaN(config.options.notifymin)) {
-		config.options.notifymin = -1;
-	}
 } catch (e) {
 	if (e.code !== 'ENOENT') {
 		console.error(e);
 		process.exit(1);
 	}
 
-	// console.error(e);
-	config = {
-		senders:			[],
-		options: {
-			random:			false,
-			sendOldest:		true,
-			visibility:		"public",
-			times:			[],
-			alltoots:		false,
-			notifymin:		3
-		}
-	};
+	config = {};
+}
+
+set(config,			'senders',		[]);
+set(config,			'options',		{});
+set(config.options,	'random',		false);
+set(config.options,	'sendOldest',	true);
+set(config.options,	'visibility',	'public');
+set(config.options,	'times',		[]);
+set(config.options,	'boost',		true);
+set(config.options,	'alltoots',		false);
+
+if (isNaN(config.options.notifymin)) {
+	config.options.notifymin = -1;
+	configChanged = true;
+}
+
+function set(obj, name, defvalue)
+{
+	if (!obj || !name) {
+		return;
+	}
+
+	if ('undefined' === typeof obj[name]) {
+		obj[name] = defvalue;
+		configChanged = true;
+	}
 }
 
 function ask(question: string): Promise<string>
@@ -525,37 +537,48 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 			process.exit(1);
 		}
 
-		/* Normal mode; look for an image to post */
-		if (config.options.times && !opts['now']) {
-			for (let time of config.options.times) {
-				let parts	= time.split('>');
-				let cycle	= parts[0].trim();
-				let min		= (parts[1] || '0').trim();
-				let m		= 0;
-
-				if (0 === min.indexOf('=')) {
-					/* >= x */
-					m = parseInt(min.slice(1)) - 1;
-				} else {
-					/* > x */
-					m = parseInt(min);
-				}
-
-				ontime({
-					cycle:	cycle,
-					utc:	false,
-					single:	false,
-					log:	true
-				}, (ot) => {
-					FindImage(m)
-					.then(() => {
-						ot.done();
-					});
-				});
+		Promise.resolve()
+		.then(() => {
+			if (configChanged) {
+				configChanged = false;
+				return writeFile(opts['config'], JSON.stringify(config, null, 4), 'utf8');
+			} else {
+				return;
 			}
-		} else {
-			FindImage(0);
-		}
+		})
+		.then(() => {
+			/* Normal mode; look for an image to post */
+			if (config.options.times && config.options.times[0] && !opts['now']) {
+				for (let time of config.options.times) {
+					let parts	= time.split('>');
+					let cycle	= parts[0].trim();
+					let min		= (parts[1] || '0').trim();
+					let m		= 0;
+
+					if (0 === min.indexOf('=')) {
+						/* >= x */
+						m = parseInt(min.slice(1)) - 1;
+					} else {
+						/* > x */
+						m = parseInt(min);
+					}
+
+					ontime({
+						cycle:	cycle,
+						utc:	false,
+						single:	false,
+						log:	true
+					}, (ot) => {
+						FindImage(m)
+						.then(() => {
+							ot.done();
+						});
+					});
+				}
+			} else {
+				return FindImage(0);
+			}
+		})
 	}
 }
 
