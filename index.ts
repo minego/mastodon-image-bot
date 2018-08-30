@@ -57,12 +57,29 @@ set(config.options,	'random',		false);
 set(config.options,	'sendOldest',	true);
 set(config.options,	'visibility',	'public');
 set(config.options,	'times',		[]);
+set(config.options,	'tags',			[]);
 set(config.options,	'boost',		true);
 set(config.options,	'alltoots',		false);
 
 if (isNaN(config.options.notifymin)) {
 	config.options.notifymin = -1;
 	configChanged = true;
+}
+
+/* Ensure that all tags do NOT have a leading # */
+for (let i = 0, tag; tag = config.options.tags[i]; i++) {
+	if ('#' === tag.charAt(0)) {
+		config.options.tags[i] = tag.slice(1);
+		configChanged = true;
+	}
+}
+
+/* A sender should NOT have a leading @ */
+for (let i = 0, sender; sender = config.senders[i]; i++) {
+	if ('@' === sender.charAt(0)) {
+		config.senders[i] = sender.slice(1);
+		configChanged = true;
+	}
 }
 
 function set(obj, name, defvalue)
@@ -229,25 +246,62 @@ function AttachImage(id: number, url: string, description ?: string): Promise<nu
 /*
 	Cleanup the status text which comes in as HTML and likely starts with a
 	mention of the bot's username.
-*/
-function CleanText(html: string): string
-{
-	/* We want to keep any new lines */
-	let text = html.replace(/<br>/gi, '\n');
-	let parts = entities.decode(striptags(text)).split(' ');
 
-	/* Strip the leading mention */
-	while (parts[0] && 0 == parts[0].indexOf('@')) {
-		parts.shift();
+	'<p><span class="h-card"><a href="https://birb.site/@birb" class="u-url mention">@<span>birb</span></a></span> Test <a href="https://birb.site/tags/birb" class="mention hashtag" rel="tag">#<span>birb</span></a> <a href="https://birb.site/tags/bird" class="mention hashtag" rel="tag">#<span>bird</span></a> Moo</p><p>COW</p>'
+	'<p><span class="h-card"><a href="https://birb.site/@birb" class="u-url mention">@<span>birb</span></a></span> </p><p>1<br />  2<br />    3<br />      4</p><p>5</p><p>6</p><p>7</p><p>8</p><p>10</p>',
+*/
+function CleanText(html: string, tags): string
+{
+	// console.log('CleanText', html);
+
+	/*
+		We want to keep any new lines
+
+		Mastodon only gives us a sanitized html document, so attempt to
+		replicate the new lines caused by various <br /> tags and <p> tags.
+	*/
+	html = html.replace(/<br[^>]*>/gi, '\n');
+	html = html.replace(/<p[^>]*>/gi, '\n');
+	html = html.replace(/<\/p>/gi, '\n');
+
+	let text = entities.decode(striptags(html));
+
+	/* Strip any leading mentions */
+	let re = /^\s*@[^\s]*\s*/
+
+	while (text.match(re)) {
+		text = text.replace(re, '');
 	}
 
-	return(parts.join(' '));
+	/* Add tags to the end that aren't already present */
+	let addTags = [];
+
+	for (let tag of config.options.tags) {
+		let found = false;
+
+		for (let t of tags) {
+			if (t.name.toLowerCase() === tag.toLowerCase()) {
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			addTags.push('#' + tag);
+		}
+	}
+
+	if (addTags && addTags[0]) {
+		text += '\n\n' + addTags.join(' ');
+	}
+
+	return(text);
 }
 
-function Post(html: string, media, sensitive, cw): Promise<any>
+function Post(html: string, tags, media, sensitive, cw): Promise<any>
 {
 	let options = {
-		status:			CleanText(html),
+		status:			CleanText(html, tags),
 		media_ids:		media,
 		sensitive:		sensitive,
 		visibility:		config.options.visibility || "public"
@@ -467,7 +521,7 @@ function FindImage(minimum: number): Promise<any>
 				console.log(attachment);
 			}
 
-			console.log('Cleaned: ', CleanText(image.status.content));
+			console.log('Cleaned: ', CleanText(image.status.content, image.status.tags));
 			return;
 		}
 
@@ -488,7 +542,7 @@ function FindImage(minimum: number): Promise<any>
 
 		return Dismiss(image.id)
 		.then(() => {
-			return Post(image.status.content, media_ids, image.status.sensitive, image.status.spoiler_text)
+			return Post(image.status.content, image.status.tags, media_ids, image.status.sensitive, image.status.spoiler_text)
 		});
 	});
 }
