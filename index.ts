@@ -41,6 +41,10 @@ try {
 
 	config.url.base		= `https://${config.url.host}`;
 	config.url.endpoint	= `${config.url.base}/api/v1/`;
+
+	if (isNaN(config.options.notifymin)) {
+		config.options.notifymin = -1;
+	}
 } catch (e) {
 	if (e.code !== 'ENOENT') {
 		console.error(e);
@@ -55,7 +59,8 @@ try {
 			sendOldest:		true,
 			visibility:		"public",
 			times:			[],
-			alltoots:		false
+			alltoots:		false,
+			notifymin:		3
 		}
 	};
 }
@@ -246,6 +251,31 @@ function Post(html: string, media, sensitive, cw): Promise<any>
 	});
 }
 
+function SendAlert(total: number): Promise<any>
+{
+	let status = [];
+
+	for (let sender of config.senders) {
+		status.push('@' + sender);
+	}
+
+	if (total) {
+		status.push('The queue for this bot only has ' + total + ' items left');
+	} else {
+		status.push('The queue for this bot is empty');
+	}
+
+	let options = {
+		status:			status.join(' '),
+		visibility:		'direct'
+	};
+
+	return M.post('statuses', options)
+	.then((res) => {
+		console.log('new status results: ', res.data);
+	});
+}
+
 function isUsableNotification(post, dismissList ?: any[])
 {
 	if (-1 === post.account.acct.indexOf('@')) {
@@ -366,6 +396,10 @@ function FindImage(minimum: number): Promise<any>
 
 		if (opts['dryrun']) {
 			console.log(`Found ${total} suitable posts, minimum is ${minimum}`);
+		}
+
+		if (total <= config.options.notifymin) {
+			p.push(SendAlert(total));
 		}
 
 		if (total === 0) {
