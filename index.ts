@@ -595,7 +595,11 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 		.then(() => {
 			if (configChanged) {
 				configChanged = false;
-				return writeFile(opts['config'], JSON.stringify(config, null, 4), 'utf8');
+				return writeFile(opts['config'], JSON.stringify(config, null, 4), 'utf8')
+				.catch((err) => {
+					/* Ignore write errors, leave the config file as is */
+					;
+				});
 			} else {
 				return;
 			}
