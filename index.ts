@@ -26,6 +26,7 @@ program
 .option('-t, --trust <user>',		'Specify a username that should be trusted, and exit', addToList, [])
 .option('-d, --distrust <user>',	'Specify a username that should no longer be trusted, and exit', addToList, [])
 .option('-D, --dryrun',				'Print info about what would be done, but do not do anything')
+.option('-n, --now',				'Ignore configured times and run now')
 
 program.parse(process.argv);
 let opts = program.opts();
@@ -208,19 +209,28 @@ function AttachImage(id: number, url: string, description ?: string): Promise<nu
 	});
 }
 
-function Post(text, media, sensitive, cw): Promise<any>
+/*
+	Cleanup the status text which comes in as HTML and likely starts with a
+	mention of the bot's username.
+*/
+function CleanText(html: string): string
 {
-	/*
-		Cleanup the status text which comes in as HTML and likely starts with a
-		mention of the bot's username.
-	*/
+	/* We want to keep any new lines */
+	let text = html.replace(/<br>/gi, '\n');
 	let parts = entities.decode(striptags(text)).split(' ');
+
+	/* Strip the leading mention */
 	while (parts[0] && 0 == parts[0].indexOf('@')) {
 		parts.shift();
 	}
 
+	return(parts.join(' '));
+}
+
+function Post(html: string, media, sensitive, cw): Promise<any>
+{
 	let options = {
-		status:			parts.join(' '),
+		status:			CleanText(html),
 		media_ids:		media,
 		sensitive:		sensitive,
 		visibility:		config.options.visibility || "public"
@@ -405,11 +415,13 @@ function FindImage(minimum: number): Promise<any>
 		}
 
 		if (opts['dryrun']) {
-			console.log('NOT reposting: ', image);
+			console.log('NOT reposting: ', image.status);
 
 			for (let attachment of image.status.media_attachments) {
 				console.log(attachment);
 			}
+
+			console.log('Cleaned: ', CleanText(image.status.content));
 			return;
 		}
 
@@ -480,7 +492,7 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 		}
 
 		/* Normal mode; look for an image to post */
-		if (config.options.times) {
+		if (config.options.times && !opts['now']) {
 			for (let time of config.options.times) {
 				let parts	= time.split('>');
 				let cycle	= parts[0].trim();
