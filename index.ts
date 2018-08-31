@@ -34,6 +34,7 @@ let opts = program.opts();
 
 let rl;
 let M;
+let account;
 let config;
 let configChanged	= false;
 
@@ -591,7 +592,11 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 			process.exit(1);
 		}
 
-		Promise.resolve()
+		M.get('accounts/verify_credentials', {})
+		.then((res) => {
+			// console.log('Account:', res.data);
+			account = res.data;
+		})
 		.then(() => {
 			if (configChanged) {
 				configChanged = false;
@@ -625,7 +630,8 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 						cycle:	cycle,
 						utc:	false,
 						single:	false,
-						log:	true
+						log:	true,
+						id:		'@' + account.username + '@' + config.url.host + ' ' + cycle
 					}, (ot) => {
 						FindImage(m)
 						.then(() => {
