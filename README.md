@@ -49,7 +49,9 @@ file:
 
 The bot will respond to the following commands from authorized senders:
 
-	$count: Report the number of currently queued items
+	$count
+		Report the number of currently queued items
 
-	$review: Send all currently queued items as DMs to the sender
+	$review [<id> ...]
+		Send all (or specified) currently queued items as DMs to the sender
 

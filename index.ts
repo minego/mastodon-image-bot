@@ -590,7 +590,7 @@ function FindImage(minimum: number): Promise<any>
 	});
 }
 
-function CountCmd(line: string, orgpost)
+function CountCmd(parts: string[], orgpost)
 {
 	let options = {
 		only_media:		true,
@@ -617,8 +617,10 @@ function CountCmd(line: string, orgpost)
 	});
 }
 
-function ReviewCmd(line: string, orgpost)
+function ReviewCmd(parts: string[], orgpost)
 {
+	parts.shift();
+
 	let options = {
 		only_media:		true,
 		limit:			30,
@@ -637,7 +639,21 @@ function ReviewCmd(line: string, orgpost)
 
 			total++;
 
-			p.push(PostImage(post, false, false, orgpost.account.acct, '#' + total));
+			let send = false;
+
+			if (0 === parts.length) {
+				send = true;
+			} else {
+				for (let i = 0; i < parts.length; i++) {
+					if (parseInt(parts[i]) === total) {
+						send = true;
+					}
+				}
+			}
+
+			if (send) {
+				p.push(PostImage(post, false, false, orgpost.account.acct, '#' + total));
+			}
 		}
 
 		return Promise.all(p);
@@ -691,11 +707,11 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 			if ('$' !== line.charAt(0)) {
 				return;
 			}
-			line = line.replace(/./, '').trim().toLowerCase();
+			let parts = line.replace(/./, '').trim().split(' ');
 
-			switch (line) {
-				case 'count':	CountCmd(line, msg.data);	break;
-				case 'review':	ReviewCmd(line, msg.data);	break;
+			switch (parts[0].toLowerCase()) {
+				case 'count':	CountCmd(parts, msg.data);	break;
+				case 'review':	ReviewCmd(parts, msg.data);	break;
 			}
 		});
 
