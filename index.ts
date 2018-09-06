@@ -219,14 +219,14 @@ function DownloadImage(id: number, url: string): Promise<string>
 	});
 }
 
-function AttachImage(id: number, url: string, description ?: string): Promise<number>
+function AttachImage(imgpath: string, description: string, tries): Promise<number>
 {
-	let imgpath;
+	if (tries > 35) {
+		throw new Error('Gave up attaching image: ' + imgpath);
+	}
 
-	return DownloadImage(id, url)
-	.then((path) => {
-		imgpath = path;
-
+	return Promise.resolve()
+	.then(() => {
 		let options = { file: fs.createReadStream(imgpath) };
 
 		if (description) {
@@ -236,6 +236,12 @@ function AttachImage(id: number, url: string, description ?: string): Promise<nu
 		return M.post('media', options);
 	})
 	.then((res) => {
+		if (res.data.type !== 'image') {
+			/* retry */
+			console.log('Retrying iage upload', imgpath);
+			return AttachImage(imgpath, description, tries + 1);
+		}
+
 		fs.unlinkSync(imgpath);
 		return(parseInt(res.data.id));
 	});
@@ -477,7 +483,14 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 
 		for (let attachment of image.status.media_attachments) {
 			// console.log(attachment);
-			media.push(AttachImage(attachment.id, attachment.url, attachment.description));
+
+
+			media.push(
+				DownloadImage(attachment.id, attachment.url)
+				.then((path) => {
+					return AttachImage(path, attachment.description, 1);
+				})
+			);
 		}
 
 		return Promise.all(media);
@@ -712,6 +725,9 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 			switch (parts[0].toLowerCase()) {
 				case 'count':	CountCmd(parts, msg.data);	break;
 				case 'review':	ReviewCmd(parts, msg.data);	break;
+				default:
+					console.error('Unknown command', parts[0]);
+					break;
 			}
 		});
 

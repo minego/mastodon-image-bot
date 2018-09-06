@@ -1,6 +1,6 @@
 {
   "name": "mastodon-picture-bot",
-  "version": "1.0.16",
+  "version": "1.0.17",
   "description": "A simple image posting bot for Mastodon",
   "main": "index.js",
   "bin": {
