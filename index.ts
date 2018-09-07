@@ -110,6 +110,40 @@ function ask(question: string): Promise<string>
 	});
 }
 
+function getNotifications(options, data ?: any): Promise<any>
+{
+	let		lowest	= NaN;
+
+	data = data || [];
+	for (let post of data) {
+		let id	= parseInt(post.id);
+
+		if (isNaN(lowest) || id < lowest) {
+			lowest = id;
+		}
+	}
+
+	if (!isNaN(lowest)) {
+		options.max_id = lowest;
+	}
+
+	return M.get('notifications', options)
+	.then((res) => {
+		if (res && res.data && res.data.length > 0) {
+			for (let post of res.data) {
+				data.push(post);
+			}
+			delete res.data;
+
+			/* Get another page */
+			return(getNotifications(options, data));
+		} else {
+			/* All done */
+			return(data);
+		}
+	});
+}
+
 function Authorize()
 {
 	ask('Instance host: ')
@@ -539,11 +573,11 @@ function FindImage(minimum: number): Promise<any>
 	let skip		= 0;
 	let total		= 0;
 
-	return M.get('notifications', options)
-	.then((res) => {
+	return getNotifications(options)
+	.then((data) => {
 		let p = [];
 
-		for (let post of res.data) {
+		for (let post of data) {
 			if (isUsableNotification(post, p)) {
 				total++;
 			}
@@ -582,7 +616,7 @@ function FindImage(minimum: number): Promise<any>
 			skip = 0;
 		}
 
-		for (let post of res.data) {
+		for (let post of data) {
 			if (!isUsableNotification(post)) {
 				continue;
 			}
@@ -613,9 +647,9 @@ function CountCmd(parts: string[], orgpost)
 
 	let total		= 0;
 
-	return M.get('notifications', options)
-	.then((res) => {
-		for (let post of res.data) {
+	return getNotifications(options)
+	.then((data) => {
+		for (let post of data) {
 			if (isUsableNotification(post)) {
 				total++;
 			}
@@ -643,9 +677,9 @@ function ReviewCmd(parts: string[], orgpost)
 	let total	= 0;
 	let p		= [];
 
-	return M.get('notifications', options)
-	.then((res) => {
-		for (let post of res.data) {
+	return getNotifications(options)
+	.then((data) => {
+		for (let post of data) {
 			if (!isUsableNotification(post)) {
 				continue;
 			}
