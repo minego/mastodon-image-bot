@@ -301,7 +301,7 @@ function TagText(text: string, tags): string
 	}
 
 	if (addTags && addTags[0]) {
-		text += '\n\n' + addTags.join(' ');
+		text += ' ' + addTags.join(' ');
 	}
 
 	return(text);
