@@ -742,6 +742,11 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 				let cycle	= parts[0].trim();
 				let min		= (parts[1] || '0').trim();
 				let m		= 0;
+				let step	= 1;
+
+				parts		= cycle.split('/');
+				cycle		= parts[0].trim();
+				step		= parseInt((parts[1] || '1').trim());
 
 				if (0 === min.indexOf('=')) {
 					/* >= x */
@@ -753,6 +758,7 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 
 				ontime({
 					cycle:	cycle,
+					step:	step,
 					utc:	false,
 					single:	false,
 					log:	true,

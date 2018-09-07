@@ -23,9 +23,14 @@ file:
 	then the most recent applicable toot will be sent instead.
 
 	- times: A list of strings, each containing a time of day that the bot
-	should post, optionally followed by > and a value to indicate that the time
-	should be skipped if there are not at least the specified count of posts
-	available to send.
+	should post.
+
+	A time value may be followed by a / and a value to indicate that it should
+	only run every n times.
+
+	A time value may also be followed by a > and a value to indicate that the
+	time should be skipped if there are not at least the sepcified count of
+	posts available to send.
 
 	Example:
 		Send at midnight. If there are at least 10 images in the queue then also
@@ -34,6 +39,7 @@ file:
 		"times": [
 			"00:00:00",
 			"12:00:00 > 10"
+			"18:00:00 / 3"
 		]
 
 	- visibility: The visibility that should be set for new posts. May be:
