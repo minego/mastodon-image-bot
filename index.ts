@@ -507,7 +507,7 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 		}
 	})
 	.then(() => {
-		let content	= TagText(CleanText(image.status.content), image.status.tags);
+		let content	= image.status.cleancontent || TagText(CleanText(image.status.content), image.status.tags);
 		let parts	= [];
 
 		if (to) {
@@ -673,6 +673,20 @@ function ReviewCmd(parts: string[], orgpost)
 	});
 }
 
+function SendCmd(parts: string[], orgpost)
+{
+	parts.shift();
+
+	let content	= TagText(CleanText(orgpost.status.content), orgpost.status.tags);
+
+	/* Strip the command */
+	orgpost.status.cleancontent = content.replace(/^[^\s]*\s/, '');
+
+	return PostImage(orgpost, true, opts['dryrun']);
+}
+
+
+
 if (!config || !config.url || !config.accessToken || opts['authorize']) {
 	console.log('First use; configuring');
 	Authorize();
@@ -725,6 +739,7 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 			switch (parts[0].toLowerCase()) {
 				case 'count':	CountCmd(parts, msg.data);	break;
 				case 'review':	ReviewCmd(parts, msg.data);	break;
+				case 'send':	SendCmd(parts, msg.data);	break;
 				default:
 					console.error('Unknown command', parts[0]);
 					break;
