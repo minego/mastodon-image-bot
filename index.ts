@@ -1,11 +1,11 @@
 import Mastodon		= require('mastodon-api');
 import readline		= require('readline');
-import https		= require('https');
 import fs			= require('fs');
 import util			= require('util');
 import striptags	= require('striptags');
 import program		= require('commander');
 import ontime		= require('ontime');
+const  https		= require('follow-redirects').https;
 const Entities		= require('html-entities').AllHtmlEntities;
 const entities		= new Entities();
 const pkg			= require(__dirname + '/package.json');
