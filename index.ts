@@ -272,7 +272,7 @@ function AttachImage(imgpath: string, description: string, tries): Promise<numbe
 	.then((res) => {
 		if (res.data.type !== 'image') {
 			/* retry */
-			console.log('Retrying iage upload', imgpath);
+			console.log('Retrying image upload', imgpath);
 			return AttachImage(imgpath, description, tries + 1);
 		}
 
