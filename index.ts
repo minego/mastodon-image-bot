@@ -273,7 +273,15 @@ function AttachImage(imgpath: string, description: string, tries): Promise<numbe
 		if (res.data.type !== 'image') {
 			/* retry */
 			console.log('Retrying image upload', imgpath);
-			return AttachImage(imgpath, description, tries + 1);
+
+			return new Promise((resolve, reject) => {
+				setTimeout(() => {
+					resolve();
+				}, 60000);
+			})
+			.then(() => {
+				return AttachImage(imgpath, description, tries + 1);
+			});
 		}
 
 		fs.unlinkSync(imgpath);
