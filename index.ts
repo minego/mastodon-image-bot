@@ -79,6 +79,7 @@ for (let i = 0, sender; sender = config.senders[i]; i++) {
 		config.senders[i] = sender.slice(1);
 		configChanged = true;
 	}
+	config.senders[i] = config.senders[i].toLowerCase();
 }
 
 function set(obj, name, defvalue)
@@ -411,7 +412,7 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 	}
 
 	if (!post.status.favourited &&
-		(!post.account || -1 == config.senders.indexOf(post.account.acct))
+		(!post.account || -1 == config.senders.indexOf(post.account.acct.toLowerCase()))
 	) {
 		/*
 			This sender isn't authorized
