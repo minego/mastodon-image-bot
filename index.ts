@@ -337,8 +337,10 @@ function CleanText(html: string, stripMentions: boolean, mentions): string
 		let a = "<span>" + mention.username + "</span>";
 		let b = "<span>" + mention.acct + "</span>";
 
-		while (html.indexOf(a) >= 0) {
-			html = html.replace(a, b);
+		if (a !== b) {
+			while (html.indexOf(a) >= 0) {
+				html = html.replace(a, b);
+			}
 		}
 	}
 
