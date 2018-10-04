@@ -391,7 +391,9 @@ function SendAlert(total: number): Promise<any>
 	let status = [];
 
 	for (let sender of config.senders) {
-		status.push('@' + sender);
+		if (sender.charAt(0) !== '-') {
+			status.push('@' + sender);
+		}
 	}
 
 	if (total) {
@@ -413,6 +415,8 @@ function SendAlert(total: number): Promise<any>
 
 function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, cmds ?: boolean)
 {
+	let allowed = false;
+
 	if (!post || !post.account || !post.status) {
 		return(false);
 	}
@@ -428,9 +432,22 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 		post.account.acct += '@' + config.url.host;
 	}
 
-	if (!post.status.favourited &&
-		(!post.account || -1 == config.senders.indexOf(post.account.acct.toLowerCase()))
-	) {
+	allowed = post.status.favourited;
+
+	if (!allowed && post.account) {
+		let postSender = post.account.acct.toLowerCase();
+
+		for (let sender of config.senders) {
+			if (sender === postSender ||
+				sender === '-' + postSender
+			) {
+				allowed = true;
+				break;
+			}
+		}
+	}
+
+	if (!allowed) {
 		/*
 			This sender isn't authorized
 
