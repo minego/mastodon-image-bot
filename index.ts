@@ -779,6 +779,11 @@ function SendCmd(parts: string[], orgpost)
 	return PostImage(orgpost, true, opts['dryrun']);
 }
 
+function NowCmd(parts: string[], orgpost)
+{
+	return FindImage(0);
+}
+
 
 
 if (!config || !config.url || !config.accessToken || opts['authorize']) {
@@ -834,6 +839,7 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 				case 'count':	CountCmd(parts, msg.data);	break;
 				case 'review':	ReviewCmd(parts, msg.data);	break;
 				case 'send':	SendCmd(parts, msg.data);	break;
+				case 'now':		NowCmd(parts, msg.data);	break;
 				default:
 					console.error('Unknown command', parts[0]);
 					break;
