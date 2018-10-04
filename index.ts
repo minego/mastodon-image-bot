@@ -435,14 +435,21 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 	allowed = post.status.favourited;
 
 	if (!allowed && post.account) {
-		let postSender = post.account.acct.toLowerCase();
+		let postSender	= post.account.acct.toLowerCase();
+		let me			= (account.username + '@' + config.url.host).toLowerCase();
 
-		for (let sender of config.senders) {
-			if (sender === postSender ||
-				sender === '-' + postSender
-			) {
-				allowed = true;
-				break;
+		if (postSender === me) {
+			allowed = true;
+		}
+
+		if (!allowed) {
+			for (let sender of config.senders) {
+				if (sender === postSender ||
+					sender === '-' + postSender
+				) {
+					allowed = true;
+					break;
+				}
 			}
 		}
 	}
