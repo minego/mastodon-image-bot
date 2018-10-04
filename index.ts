@@ -238,7 +238,7 @@ function Unboost(id: number): Promise<void>
 	});
 }
 
-function DownloadImage(id: number, url: string): Promise<string>
+function DownloadImage(id: number, url: string, tries: number): Promise<any>
 {
 	return new Promise((resolve, reject) => {
 		let name = `/tmp/mastodon-image-bot-${id}`;
@@ -251,12 +251,29 @@ function DownloadImage(id: number, url: string): Promise<string>
 				resolve(name);
 			});
 		});
+	})
+	.catch((err) => {
+		if (tries <= 0) {
+			throw err;
+		}
+
+		/* Retry */
+		console.log('Retrying image download', url);
+
+		return new Promise((resolve, reject) => {
+			setTimeout(() => {
+				resolve();
+			}, 60000);
+		})
+		.then(() => {
+			return DownloadImage(id, url, tries - 1);
+		});
 	});
 }
 
-function AttachImage(imgpath: string, description: string, tries): Promise<number>
+function AttachImage(imgpath: string, description: string, tries: number): Promise<number>
 {
-	if (tries > 35) {
+	if (tries <= 0) {
 		throw new Error('Gave up attaching image: ' + imgpath);
 	}
 
@@ -281,7 +298,7 @@ function AttachImage(imgpath: string, description: string, tries): Promise<numbe
 				}, 60000);
 			})
 			.then(() => {
-				return AttachImage(imgpath, description, tries + 1);
+				return AttachImage(imgpath, description, tries - 1);
 			});
 		}
 
@@ -529,9 +546,9 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 
 
 			media.push(
-				DownloadImage(attachment.id, attachment.url)
+				DownloadImage(attachment.id, attachment.url, 35)
 				.then((path) => {
-					return AttachImage(path, attachment.description, 1);
+					return AttachImage(path, attachment.description, 35);
 				})
 			);
 		}
