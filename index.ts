@@ -314,7 +314,7 @@ function AttachImage(imgpath: string, description: string, tries: number): Promi
 	'<p><span class="h-card"><a href="https://birb.site/@birb" class="u-url mention">@<span>birb</span></a></span> Test <a href="https://birb.site/tags/birb" class="mention hashtag" rel="tag">#<span>birb</span></a> <a href="https://birb.site/tags/bird" class="mention hashtag" rel="tag">#<span>bird</span></a> Moo</p><p>COW</p>'
 	'<p><span class="h-card"><a href="https://birb.site/@birb" class="u-url mention">@<span>birb</span></a></span> </p><p>1<br />  2<br />    3<br />      4</p><p>5</p><p>6</p><p>7</p><p>8</p><p>10</p>',
 */
-function CleanText(html: string): string
+function CleanText(html: string, stripMentions: boolean): string
 {
 	// console.log('CleanText', html);
 
@@ -330,11 +330,13 @@ function CleanText(html: string): string
 
 	let text = entities.decode(striptags(html));
 
-	/* Strip any leading mentions */
-	let re = /^\s*@[^\s]*\s*/
+	if (stripMentions) {
+		/* Strip any leading mentions */
+		let re = /^\s*@[^\s]*\s*/
 
-	while (text.match(re)) {
-		text = text.replace(re, '');
+		while (text.match(re)) {
+			text = text.replace(re, '');
+		}
 	}
 
 	return(text);
@@ -422,7 +424,7 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 	}
 
 	/* Ignore commands (they start with a $) */
-	let content = CleanText(post.status.content).trim();
+	let content = CleanText(post.status.content, true).trim();
 	if ('$' === content.charAt(0) && !cmds) {
 		return(false);
 	}
@@ -438,8 +440,16 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 		let postSender	= post.account.acct.toLowerCase();
 		let me			= (account.username + '@' + config.url.host).toLowerCase();
 
+		/*
+			The bot itself can post DMs to toot, but they should NOT start with
+			a mention.
+		*/
 		if (postSender === me) {
-			allowed = true;
+			content = CleanText(post.status.content, false).trim();
+
+			if (content.charAt(0) !== '@') {
+				allowed = true;
+			}
 		}
 
 		if (!allowed) {
@@ -556,7 +566,7 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 			console.log(attachment);
 		}
 
-		console.log('Cleaned: ', TagText(CleanText(image.status.content), image.status.tags));
+		console.log('Cleaned: ', TagText(CleanText(image.status.content, true), image.status.tags));
 		return Promise.resolve();
 	}
 
@@ -591,7 +601,7 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 		}
 	})
 	.then(() => {
-		let content	= image.status.cleancontent || TagText(CleanText(image.status.content), image.status.tags);
+		let content	= image.status.cleancontent || TagText(CleanText(image.status.content, true), image.status.tags);
 		let parts	= [];
 
 		if (to) {
@@ -761,7 +771,7 @@ function SendCmd(parts: string[], orgpost)
 {
 	parts.shift();
 
-	let content	= TagText(CleanText(orgpost.status.content), orgpost.status.tags);
+	let content	= TagText(CleanText(orgpost.status.content, true), orgpost.status.tags);
 
 	/* Strip the command */
 	orgpost.status.cleancontent = content.replace(/^[^\s]*\s/, '');
@@ -813,7 +823,7 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 				return;
 			}
 
-			let line = CleanText(msg.data.status.content);
+			let line = CleanText(msg.data.status.content, true);
 
 			if ('$' !== line.charAt(0)) {
 				return;
