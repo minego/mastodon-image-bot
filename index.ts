@@ -314,7 +314,7 @@ function AttachImage(imgpath: string, description: string, tries: number): Promi
 	'<p><span class="h-card"><a href="https://birb.site/@birb" class="u-url mention">@<span>birb</span></a></span> Test <a href="https://birb.site/tags/birb" class="mention hashtag" rel="tag">#<span>birb</span></a> <a href="https://birb.site/tags/bird" class="mention hashtag" rel="tag">#<span>bird</span></a> Moo</p><p>COW</p>'
 	'<p><span class="h-card"><a href="https://birb.site/@birb" class="u-url mention">@<span>birb</span></a></span> </p><p>1<br />  2<br />    3<br />      4</p><p>5</p><p>6</p><p>7</p><p>8</p><p>10</p>',
 */
-function CleanText(html: string, stripMentions: boolean): string
+function CleanText(html: string, stripMentions: boolean, mentions): string
 {
 	// console.log('CleanText', html);
 
@@ -327,6 +327,20 @@ function CleanText(html: string, stripMentions: boolean): string
 	html = html.replace(/<br[^>]*>/gi, '\n');
 	html = html.replace(/<p[^>]*>/gi, '\n');
 	html = html.replace(/<\/p>/gi, '\n');
+
+	/*
+		We want the final cleaned string to have the full username with the
+		instance included. Let the server clean it up if it matches the local
+		instance name.
+	*/
+	for (let mention of (mentions || [])) {
+		let a = "<span>" + mention.username + "</span>";
+		let b = "<span>" + mention.acct + "</span>";
+
+		while (html.indexOf(a) >= 0) {
+			html = html.replace(a, b);
+		}
+	}
 
 	let text = entities.decode(striptags(html));
 
@@ -424,7 +438,7 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 	}
 
 	/* Ignore commands (they start with a $) */
-	let content = CleanText(post.status.content, true).trim();
+	let content = CleanText(post.status.content, true, post.status.mentions).trim();
 	if ('$' === content.charAt(0) && !cmds) {
 		return(false);
 	}
@@ -445,7 +459,7 @@ function isUsableNotification(post, dismissList ?: any[], alltoots ?: boolean, c
 			a mention.
 		*/
 		if (postSender === me) {
-			content = CleanText(post.status.content, false).trim();
+			content = CleanText(post.status.content, false, post.status.mentions).trim();
 
 			if (content.charAt(0) !== '@') {
 				allowed = true;
@@ -566,7 +580,7 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 			console.log(attachment);
 		}
 
-		console.log('Cleaned: ', TagText(CleanText(image.status.content, true), image.status.tags));
+		console.log('Cleaned: ', TagText(CleanText(image.status.content, true, image.status.mentions), image.status.tags));
 		return Promise.resolve();
 	}
 
@@ -601,7 +615,7 @@ function PostImage(image, dismiss: boolean, dryrun: boolean, to ?: string, prefi
 		}
 	})
 	.then(() => {
-		let content	= image.status.cleancontent || TagText(CleanText(image.status.content, true), image.status.tags);
+		let content	= image.status.cleancontent || TagText(CleanText(image.status.content, true, image.status.mentions), image.status.tags);
 		let parts	= [];
 
 		if (to) {
@@ -771,7 +785,7 @@ function SendCmd(parts: string[], orgpost)
 {
 	parts.shift();
 
-	let content	= TagText(CleanText(orgpost.status.content, true), orgpost.status.tags);
+	let content	= TagText(CleanText(orgpost.status.content, true, orgpost.status.mentions), orgpost.status.tags);
 
 	/* Strip the command */
 	orgpost.status.cleancontent = content.replace(/^[^\s]*\s/, '');
@@ -828,7 +842,7 @@ if (!config || !config.url || !config.accessToken || opts['authorize']) {
 				return;
 			}
 
-			let line = CleanText(msg.data.status.content, true);
+			let line = CleanText(msg.data.status.content, true, msg.data.status.mentions);
 
 			if ('$' !== line.charAt(0)) {
 				return;
